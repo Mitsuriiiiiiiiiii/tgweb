@@ -1,6 +1,8 @@
 import http.server, socketserver, os
 
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
+here = os.path.dirname(os.path.abspath(__file__))
+www = os.path.join(here, 'www')
+os.chdir(www if os.path.isdir(www) else here)
 
 
 class H(http.server.SimpleHTTPRequestHandler):
